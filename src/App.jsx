@@ -1,6 +1,8 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  PieChart, Pie, Cell,
+  LineChart, Line,
+  AreaChart, Area
 } from 'recharts';
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
@@ -132,6 +134,55 @@ const sniffCsvHeadersLower = (text) => {
   return parseCSVRow(firstLine).map((h) => h.toLowerCase().trim());
 };
 
+const CHART_TYPES = {
+  bar: 'bar',
+  pie: 'pie',
+  line: 'line',
+  area: 'area',
+  table: 'table',
+};
+
+const ChartTypeSelect = ({ value, onChange, supportedTypes }) => (
+  <select
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    className="bg-[#1c1c1c] text-white border border-[#444] rounded-md px-2 py-1 text-xs font-medium"
+  >
+    {supportedTypes.map((t) => (
+      <option key={t} value={t}>
+        {t.toUpperCase()}
+      </option>
+    ))}
+  </select>
+);
+
+const SimpleTable = ({ headers, rows }) => (
+  <div className="w-full overflow-auto">
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="text-gray-300 border-b border-[#333]">
+          {headers.map((h) => (
+            <th key={h} className="text-left py-2 pr-3 font-semibold whitespace-nowrap">
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, idx) => (
+          <tr key={idx} className="border-b border-[#2a2a2a] text-gray-200">
+            {r.map((cell, cidx) => (
+              <td key={cidx} className="py-2 pr-3 whitespace-nowrap">
+                {cell}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
 // --- Main App ---
 
 export default function App() {
@@ -143,6 +194,14 @@ export default function App() {
   const [bgcData, setBgcData] = useState(initialBgcData);
   const [subDistrictData, setSubDistrictData] = useState(initialSubDistrictData);
   const [districts, setDistricts] = useState(['จะบังติกอ', 'สะบารัง', 'อาเนาะรู']);
+
+  const [chartTypes, setChartTypes] = useState({
+    diseases: CHART_TYPES.bar,
+    bmiDist: CHART_TYPES.pie,
+    bp: CHART_TYPES.bar,
+    bgc: CHART_TYPES.bar,
+    byDistrict: CHART_TYPES.bar,
+  });
 
   const fileInputRef = useRef(null);
 
@@ -466,30 +525,74 @@ export default function App() {
         
         {/* 2. โรคประจำตัว — ภาพรวม */}
         <div className="bg-[#242424] rounded-xl p-5 border border-[#333]">
-          <h3 className="text-white font-semibold mb-4">การประเมินความเสี่ยง / โรคประจำตัว</h3>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h3 className="text-white font-semibold">การประเมินความเสี่ยง / โรคประจำตัว</h3>
+            <ChartTypeSelect
+              value={chartTypes.diseases}
+              onChange={(t) => setChartTypes((s) => ({ ...s, diseases: t }))}
+              supportedTypes={[CHART_TYPES.bar, CHART_TYPES.line, CHART_TYPES.area, CHART_TYPES.table]}
+            />
+          </div>
           {diseasesData.length > 0 ? (
             <>
               <CustomLegend data={diseasesData} />
               <div className="h-64 w-full mt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={diseasesData} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis 
-                      dataKey="name" 
-                      tick={{ fill: '#888', fontSize: 10, angle: -35, textAnchor: 'end' }} 
-                      interval={0}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]} label={<CustomBarLabel />}>
-                      {diseasesData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                {chartTypes.diseases === CHART_TYPES.table ? (
+                  <SimpleTable
+                    headers={['หัวข้อ', 'จำนวน']}
+                    rows={diseasesData.map((d) => [d.name, d.value])}
+                  />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    {chartTypes.diseases === CHART_TYPES.line ? (
+                      <LineChart data={diseasesData} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fill: '#888', fontSize: 10, angle: -35, textAnchor: 'end' }}
+                          interval={0}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                        <Line type="monotone" dataKey="value" stroke="#e55f30" strokeWidth={2} dot={{ r: 2 }} />
+                      </LineChart>
+                    ) : chartTypes.diseases === CHART_TYPES.area ? (
+                      <AreaChart data={diseasesData} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fill: '#888', fontSize: 10, angle: -35, textAnchor: 'end' }}
+                          interval={0}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                        <Area type="monotone" dataKey="value" stroke="#e55f30" fill="#e55f3033" strokeWidth={2} />
+                      </AreaChart>
+                    ) : (
+                      <BarChart data={diseasesData} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fill: '#888', fontSize: 10, angle: -35, textAnchor: 'end' }}
+                          interval={0}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]} label={<CustomBarLabel />}>
+                          {diseasesData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                )}
               </div>
             </>
           ) : (
@@ -499,28 +602,72 @@ export default function App() {
 
         {/* 3. BMI — การกระจายตัว */}
         <div className="bg-[#242424] rounded-xl p-5 border border-[#333]">
-          <h3 className="text-white font-semibold mb-4">BMI — การกระจายตัว</h3>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h3 className="text-white font-semibold">BMI — การกระจายตัว</h3>
+            <ChartTypeSelect
+              value={chartTypes.bmiDist}
+              onChange={(t) => setChartTypes((s) => ({ ...s, bmiDist: t }))}
+              supportedTypes={[CHART_TYPES.pie, CHART_TYPES.bar, CHART_TYPES.line, CHART_TYPES.area, CHART_TYPES.table]}
+            />
+          </div>
           <CustomLegend data={bmiDistData} />
           <div className="h-64 w-full flex justify-center items-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={bmiDistData.filter(d => d.value > 0)} /* กรอง 0 ออกเพื่อไม่ให้ Pie Chart มีเส้นขยะ */
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={110}
-                  paddingAngle={0}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {bmiDistData.filter(d => d.value > 0).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {chartTypes.bmiDist === CHART_TYPES.table ? (
+              <SimpleTable
+                headers={['กลุ่ม', 'จำนวน']}
+                rows={bmiDistData.map((d) => [d.name, d.value])}
+              />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                {chartTypes.bmiDist === CHART_TYPES.pie ? (
+                  <PieChart>
+                    <Pie
+                      data={bmiDistData.filter(d => d.value > 0)} /* กรอง 0 ออกเพื่อไม่ให้ Pie Chart มีเส้นขยะ */
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={70}
+                      outerRadius={110}
+                      paddingAngle={0}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {bmiDistData.filter(d => d.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                  </PieChart>
+                ) : chartTypes.bmiDist === CHART_TYPES.line ? (
+                  <LineChart data={bmiDistData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Line type="monotone" dataKey="value" stroke="#1fb173" strokeWidth={2} dot={{ r: 2 }} />
+                  </LineChart>
+                ) : chartTypes.bmiDist === CHART_TYPES.area ? (
+                  <AreaChart data={bmiDistData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Area type="monotone" dataKey="value" stroke="#1fb173" fill="#1fb17333" strokeWidth={2} />
+                  </AreaChart>
+                ) : (
+                  <BarChart data={bmiDistData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }} barSize={45}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} label={<CustomBarLabel />}>
+                      {bmiDistData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -530,43 +677,143 @@ export default function App() {
         
         {/* 4. ระดับความดันโลหิต (Systolic) */}
         <div className="bg-[#242424] rounded-xl p-5 border border-[#333]">
-          <h3 className="text-white font-semibold mb-4">ระดับความดันโลหิต (Systolic)</h3>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h3 className="text-white font-semibold">ระดับความดันโลหิต (Systolic)</h3>
+            <ChartTypeSelect
+              value={chartTypes.bp}
+              onChange={(t) => setChartTypes((s) => ({ ...s, bp: t }))}
+              supportedTypes={[CHART_TYPES.bar, CHART_TYPES.pie, CHART_TYPES.line, CHART_TYPES.area, CHART_TYPES.table]}
+            />
+          </div>
           <CustomLegend data={bpData} />
           <div className="h-60 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={bpData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }} barSize={45}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} label={<CustomBarLabel />}>
-                  {bpData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {chartTypes.bp === CHART_TYPES.table ? (
+              <SimpleTable
+                headers={['กลุ่ม', 'จำนวน']}
+                rows={bpData.map((d) => [d.name, d.value])}
+              />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                {chartTypes.bp === CHART_TYPES.pie ? (
+                  <PieChart>
+                    <Pie
+                      data={bpData.filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={70}
+                      outerRadius={110}
+                      paddingAngle={0}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {bpData.filter(d => d.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                  </PieChart>
+                ) : chartTypes.bp === CHART_TYPES.line ? (
+                  <LineChart data={bpData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Line type="monotone" dataKey="value" stroke="#e55f30" strokeWidth={2} dot={{ r: 2 }} />
+                  </LineChart>
+                ) : chartTypes.bp === CHART_TYPES.area ? (
+                  <AreaChart data={bpData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Area type="monotone" dataKey="value" stroke="#e55f30" fill="#e55f3033" strokeWidth={2} />
+                  </AreaChart>
+                ) : (
+                  <BarChart data={bpData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }} barSize={45}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} label={<CustomBarLabel />}>
+                      {bpData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
         {/* 5. ระดับน้ำตาลในเลือด (BGC) */}
         <div className="bg-[#242424] rounded-xl p-5 border border-[#333]">
-          <h3 className="text-white font-semibold mb-4">ระดับน้ำตาลในเลือด (BGC)</h3>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h3 className="text-white font-semibold">ระดับน้ำตาลในเลือด (BGC)</h3>
+            <ChartTypeSelect
+              value={chartTypes.bgc}
+              onChange={(t) => setChartTypes((s) => ({ ...s, bgc: t }))}
+              supportedTypes={[CHART_TYPES.bar, CHART_TYPES.pie, CHART_TYPES.line, CHART_TYPES.area, CHART_TYPES.table]}
+            />
+          </div>
           <CustomLegend data={bgcData} />
           <div className="h-60 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={bgcData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }} barSize={70}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} label={<CustomTopLabel />}>
-                  {bgcData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {chartTypes.bgc === CHART_TYPES.table ? (
+              <SimpleTable
+                headers={['กลุ่ม', 'จำนวน']}
+                rows={bgcData.map((d) => [d.name, d.value])}
+              />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                {chartTypes.bgc === CHART_TYPES.pie ? (
+                  <PieChart>
+                    <Pie
+                      data={bgcData.filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={70}
+                      outerRadius={110}
+                      paddingAngle={0}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {bgcData.filter(d => d.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                  </PieChart>
+                ) : chartTypes.bgc === CHART_TYPES.line ? (
+                  <LineChart data={bgcData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Line type="monotone" dataKey="value" stroke="#ef4b4b" strokeWidth={2} dot={{ r: 2 }} />
+                  </LineChart>
+                ) : chartTypes.bgc === CHART_TYPES.area ? (
+                  <AreaChart data={bgcData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Area type="monotone" dataKey="value" stroke="#ef4b4b" fill="#ef4b4b33" strokeWidth={2} />
+                  </AreaChart>
+                ) : (
+                  <BarChart data={bgcData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }} barSize={70}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} label={<CustomTopLabel />}>
+                      {bgcData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -574,21 +821,57 @@ export default function App() {
 
       {/* 6. ค่าสุขภาพเฉลี่ยแยกตำบล */}
       <div className="bg-[#242424] rounded-xl p-5 border border-[#333]">
-        <h3 className="text-white font-semibold mb-4">ค่าสุขภาพเฉลี่ยแยกตำบล</h3>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h3 className="text-white font-semibold">ค่าสุขภาพเฉลี่ยแยกตำบล</h3>
+          <ChartTypeSelect
+            value={chartTypes.byDistrict}
+            onChange={(t) => setChartTypes((s) => ({ ...s, byDistrict: t }))}
+            supportedTypes={[CHART_TYPES.bar, CHART_TYPES.line, CHART_TYPES.area, CHART_TYPES.table]}
+          />
+        </div>
         <CustomLegend data={districts.map((d, i) => ({ name: d, color: districtColors[i % districtColors.length] }))} />
         <div className="h-72 w-full mt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={subDistrictData} margin={{ top: 20, right: 10, left: -20, bottom: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-              <XAxis dataKey="metric" tick={{ fill: '#888', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
-              <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
-              
-              {districts.map((d, i) => (
-                 <Bar key={d} dataKey={d} fill={districtColors[i % districtColors.length]} radius={[2, 2, 0, 0]} label={<CustomTopLabel />} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+          {chartTypes.byDistrict === CHART_TYPES.table ? (
+            <SimpleTable
+              headers={['Metric', ...districts]}
+              rows={subDistrictData.map((row) => [row.metric, ...districts.map((d) => row[d] ?? 0)])}
+            />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              {chartTypes.byDistrict === CHART_TYPES.line ? (
+                <LineChart data={subDistrictData} margin={{ top: 20, right: 10, left: -20, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                  <XAxis dataKey="metric" tick={{ fill: '#888', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+                  <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                  {districts.map((d, i) => (
+                    <Line key={d} type="monotone" dataKey={d} stroke={districtColors[i % districtColors.length]} strokeWidth={2} dot={{ r: 2 }} />
+                  ))}
+                </LineChart>
+              ) : chartTypes.byDistrict === CHART_TYPES.area ? (
+                <AreaChart data={subDistrictData} margin={{ top: 20, right: 10, left: -20, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                  <XAxis dataKey="metric" tick={{ fill: '#888', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+                  <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+                  {districts.map((d, i) => (
+                    <Area key={d} type="monotone" dataKey={d} stroke={districtColors[i % districtColors.length]} fill={`${districtColors[i % districtColors.length]}33`} strokeWidth={2} />
+                  ))}
+                </AreaChart>
+              ) : (
+                <BarChart data={subDistrictData} margin={{ top: 20, right: 10, left: -20, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                  <XAxis dataKey="metric" tick={{ fill: '#888', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#888', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+                  <Tooltip cursor={{ fill: '#ffffff10' }} contentStyle={{ backgroundColor: '#1c1c1c', borderColor: '#333', color: '#fff' }} />
+
+                  {districts.map((d, i) => (
+                    <Bar key={d} dataKey={d} fill={districtColors[i % districtColors.length]} radius={[2, 2, 0, 0]} label={<CustomTopLabel />} />
+                  ))}
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
