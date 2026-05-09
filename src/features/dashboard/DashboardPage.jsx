@@ -21,11 +21,11 @@ import * as XLSX from 'xlsx';
 import ChartDistrictSelect from './components/ChartDistrictSelect';
 import ChartTypeSelect from './components/ChartTypeSelect';
 import CustomLegend from './components/CustomLegend';
+import AppNavbar from './components/AppNavbar';
 import ImportExportToolbar from './components/ImportExportToolbar';
 import RawDataModal from './components/RawDataModal';
 import SimpleTable from './components/SimpleTable';
 import SummaryCard from './components/SummaryCard';
-import ThemeToggle from './components/ThemeToggle';
 import { CustomBarLabel, CustomTopLabel } from './components/chartLabels';
 import createPieHoverOutsideLabel from './components/pieHoverLabel';
 
@@ -272,22 +272,26 @@ export default function DashboardPage() {
   }, [peopleRows, districtPeopleMetric]);
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-[#1c1c1c] p-6 font-sans">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#1c1c1c] font-sans">
+      <AppNavbar theme={theme} onThemeChange={setTheme}>
+        <ImportExportToolbar
+          processedRowCount={processedRowCount}
+          onFileSelected={importFile}
+          onExportProcessedCsv={handleExportProcessedCsv}
+          onDownloadTemplateCsv={handleDownloadImportTemplateCsv}
+          onDownloadTemplateExcel={handleDownloadImportTemplateExcel}
+        />
+      </AppNavbar>
 
-      {/* Header & Import Button */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 px-2 gap-4">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">ภาพรวมสุขภาพประชากร</h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <ThemeToggle theme={theme} onChange={setTheme} />
-          <ImportExportToolbar
-            processedRowCount={processedRowCount}
-            onFileSelected={importFile}
-            onExportProcessedCsv={handleExportProcessedCsv}
-            onDownloadTemplateCsv={handleDownloadImportTemplateCsv}
-            onDownloadTemplateExcel={handleDownloadImportTemplateExcel}
-          />
+      <main className="p-6">
+        <div className="mb-8 px-2">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            ภาพรวมสุขภาพประชากร
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">
+            ดัชนีและกราฟสรุปจากข้อมูลประชากรในระบบ
+          </p>
         </div>
-      </div>
 
       {/* 1. Summary Header */}
       <div className="mb-8 px-2">
@@ -1121,6 +1125,8 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      </main>
 
       <RawDataModal
         open={!!rawModal}
