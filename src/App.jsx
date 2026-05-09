@@ -1,9 +1,10 @@
-import React from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell
 } from 'recharts';
 import { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
+import { convertHealthRowsToFinalObjects, isRawHealthFormatHeaders, objectsToCsv } from './processData';
 
 // --- ชุดข้อมูลอ้างอิงตามรูปภาพตัวอย่าง ---
 
@@ -126,6 +127,11 @@ const parseCSVRow = (rowText) => {
   return entries.map(e => e.replace(/^"|"$/g, '')); // ลบ Quote ที่ครอบอยู่ออก
 };
 
+const sniffCsvHeadersLower = (text) => {
+  const firstLine = (text || '').split(/\r?\n/)[0] || '';
+  return parseCSVRow(firstLine).map((h) => h.toLowerCase().trim());
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -140,17 +146,81 @@ export default function App() {
 
   const fileInputRef = useRef(null);
 
-  // ฟังก์ชันดักจับตอนเลือกไฟล์ CSV
-  const handleFileUpload = (event) => {
+  const readFileAsText = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result ?? '');
+      reader.onerror = () => reject(reader.error || new Error('Failed to read file as text'));
+      reader.readAsText(file);
+    });
+
+  const readFileAsArrayBuffer = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => reject(reader.error || new Error('Failed to read file as ArrayBuffer'));
+      reader.readAsArrayBuffer(file);
+    });
+
+  const isExcelFile = (file) => {
+    const name = (file?.name || '').toLowerCase();
+    return name.endsWith('.xlsx') || name.endsWith('.xls');
+  };
+
+  // ฟังก์ชันดักจับตอนเลือกไฟล์ CSV/Excel
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target.result;
-      processCSV(text);
-    };
-    reader.readAsText(file);
+    try {
+      if (isExcelFile(file)) {
+        const buf = await readFileAsArrayBuffer(file);
+        const wb = XLSX.read(buf, { type: 'array' });
+        const firstSheetName = wb.SheetNames?.[0];
+        if (!firstSheetName) return;
+        const ws = wb.Sheets[firstSheetName];
+
+        // ถ้าเป็นไฟล์ดิบ (มี Health Data) ให้ convert เหมือน ProcessData.py ก่อน
+        const jsonRows = XLSX.utils.sheet_to_json(ws, { defval: null });
+        const headersLower = Object.keys(jsonRows?.[0] || {}).map((k) => String(k).toLowerCase().trim());
+        if (isRawHealthFormatHeaders(headersLower)) {
+          const finalObjects = convertHealthRowsToFinalObjects(jsonRows);
+          const csvText = objectsToCsv(finalObjects);
+          processCSV(csvText);
+        } else {
+          // กรณีเป็นไฟล์ที่เป็นตาราง final อยู่แล้ว ก็ส่งเข้า processCSV เดิมได้
+          const csvText = XLSX.utils.sheet_to_csv(ws, { FS: ',', RS: '\n' });
+          processCSV(csvText);
+        }
+      } else {
+        const text = await readFileAsText(file);
+        // ถ้าเป็น CSV ดิบ (มี Health Data) ให้แปลงก่อน
+        const headersLower = sniffCsvHeadersLower(text);
+        if (isRawHealthFormatHeaders(headersLower)) {
+          const lines = text.trim().split(/\r?\n/);
+          if (lines.length >= 2) {
+            const headers = parseCSVRow(lines[0]);
+            const rows = [];
+            for (let i = 1; i < lines.length; i++) {
+              const values = parseCSVRow(lines[i]);
+              if (values.length >= headers.length) {
+                const obj = {};
+                headers.forEach((h, idx) => { obj[h] = values[idx]; });
+                rows.push(obj);
+              }
+            }
+            const finalObjects = convertHealthRowsToFinalObjects(rows);
+            const convertedCsv = objectsToCsv(finalObjects);
+            processCSV(convertedCsv);
+          }
+        } else {
+          processCSV(text);
+        }
+      }
+    } finally {
+      // เคลียร์ค่า input เพื่อให้เลือกไฟล์เดิมซ้ำได้
+      event.target.value = '';
+    }
   };
 
   // ฟังก์ชันอ่านและคำนวณข้อมูลจาก CSV
@@ -369,7 +439,7 @@ export default function App() {
         <div>
           <input 
             type="file" 
-            accept=".csv" 
+            accept=".csv,.xlsx,.xls" 
             ref={fileInputRef} 
             className="hidden" 
             onChange={handleFileUpload} 
@@ -379,7 +449,7 @@ export default function App() {
             className="bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white border border-[#444] px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 text-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-            Import CSV
+            Import CSV / Excel
           </button>
         </div>
       </div>
