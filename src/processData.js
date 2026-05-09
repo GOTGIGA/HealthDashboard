@@ -1,5 +1,6 @@
 const DEFAULT_OUTPUT_HEADERS = [
   'subDistrict',
+  'ชื่อผู้ใช้งาน',
   'Time',
   'adl',
   'bgc',
@@ -90,6 +91,7 @@ export const convertHealthRowsToFinalObjects = (rows) => {
     if (!groups.has(groupKey)) {
       groups.set(groupKey, {
         subDistrict,
+        'ชื่อผู้ใช้งาน': '',
         Time: time,
         adl: 0,
         bgc: 0,
@@ -107,6 +109,19 @@ export const convertHealthRowsToFinalObjects = (rows) => {
     }
 
     const out = groups.get(groupKey);
+    const userNameKey = getFirstMatchingKey(row, [
+      'ชื่อผู้ใช้งาน',
+      'username',
+      'user',
+      'userid',
+      'ชื่อผู้ใช้',
+      'user name',
+    ]);
+    if (userNameKey) {
+      const u = toStringSafe(row[userNameKey]).trim();
+      if (u) out['ชื่อผู้ใช้งาน'] = u;
+    }
+
     const hData = healthKey ? toStringSafe(row[healthKey]) : '';
 
     if (hData) {
@@ -161,3 +176,31 @@ export const convertHealthRowsToFinalObjects = (rows) => {
   return finalRows;
 };
 
+/** แถวตัวอย่างในไฟล์เทมเพลต — แก้หรือลบแล้วใส่ข้อมูลจริงก่อน Import */
+const DASHBOARD_IMPORT_TEMPLATE_SAMPLE_ROW = {
+  subDistrict: 'ตำบลตัวอย่าง',
+  'ชื่อผู้ใช้งาน': 'ชื่อ ตัวอย่าง',
+  Time: '',
+  adl: '',
+  bgc: '95',
+  bmi: '22.5',
+  bpSys: '118',
+  bw: '',
+  hei: '',
+  hr: '72',
+  o2_diff: '',
+  resp: '',
+  spo2: '98',
+  temp: '36.6',
+  diseases: '',
+};
+
+/** CSV สำหรับดาวน์โหลด (UTF-8 ใช้ร่วมกับ BOM ฝั่งแอป) */
+export const buildDashboardImportTemplateCsv = () =>
+  objectsToCsv([DASHBOARD_IMPORT_TEMPLATE_SAMPLE_ROW], DEFAULT_OUTPUT_HEADERS);
+
+/** แผ่นงาน Excel: แถวหัว + แถวตัวอย่าง */
+export const buildDashboardImportTemplateAoA = () => [
+  [...DEFAULT_OUTPUT_HEADERS],
+  DEFAULT_OUTPUT_HEADERS.map((h) => DASHBOARD_IMPORT_TEMPLATE_SAMPLE_ROW[h] ?? ''),
+];

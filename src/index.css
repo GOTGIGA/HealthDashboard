@@ -1,3 +1,6 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* บังคับให้แสดงผลเต็มจอ ปิดกั้น Default CSS ของ Vite/React */
 html, body, #root {
   width: 100%;
@@ -7,11 +10,16 @@ html, body, #root {
   text-align: left;
 }
 
-:root {
-  background-color: #111111; /* พื้นหลังมืดสนิทแบบในรูป */
+html {
+  background-color: #f1f5f9;
+}
+html.dark {
+  background-color: #111111;
 }
 
-/* ปรับ Scrollbar ให้เข้ากับ Dark Mode */
+/* Scrollbar — โหมดสว่าง / มืด */
 ::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #1a1a1a; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+html::-webkit-scrollbar-track { background: #e2e8f0; }
+html.dark::-webkit-scrollbar-track { background: #1a1a1a; }
+html::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+html.dark::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
